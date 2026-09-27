@@ -1,12 +1,9 @@
-<p align="center">
-  <img src="https://herokuapp.com" alt="Typing SVG" />
-</p>
+# 🤖 Bot WhatsApp Pro
+### 🚀 Auto Promotion Bot • AI & Downloader Features
 
-<p align="center">
-  <img src="https://shields.io" alt="Node.js" />
-  <img src="https://shields.io" alt="Baileys" />
-  <img src="https://shields.io" alt="Status" />
-</p>
+![Node.js](https://shields.io)
+![Library](https://shields.io)
+![Status](https://shields.io)
 
 ---
 
@@ -51,7 +48,7 @@ nvm alias default 20
 ```
 
 #### 🔵 LANGKAH 2: Setup Proyek & Install Dependensi
-Kloning repositori ini terlebih dahulu, lalu install library utama yang dibutuhkan:
+Kloning repositori ini terlebih dahulu, lalu install library utama yang digunakan:
 
 ```bash
 # Install Git dan inisialisasi folder
@@ -73,7 +70,6 @@ Untuk memulai bot dan memunculkan QR Code untuk di-scan, jalankan:
 ```bash
 node index.js
 ```
-*(Catatan: Sesuaikan `index.js` dengan nama file utama aplikasi Anda).*
 
 ---
 
