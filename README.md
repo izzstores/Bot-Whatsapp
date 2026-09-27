@@ -9,7 +9,6 @@
 </p>
 
 ---
----
 
 ### 📖 Deskripsi Proyek
 Solusi otomatisasi pemasaran terbaik untuk WhatsApp. **Bot WhatsApp** ini dirancang khusus untuk membantu Anda **berpromosi secara otomatis ke semua grup** secara berkala tanpa perlu mengetik manual. Dilengkapi dengan sistem pintar **Blacklist Group** untuk menghindari promosi ke grup sensitif atau grup tertentu, serta dilengkapi menu hiburan berbasis **AI** dan **Downloader**.
@@ -38,7 +37,7 @@ Jalankan perintah ini secara berurutan di terminal VPS Anda:
 apt update && apt install nodejs npm -y
 
 # Install NVM (Node Version Manager)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+curl -o- https://githubusercontent.com | bash
 
 # Reload konfigurasi shell
 source ~/.bashrc
@@ -75,16 +74,6 @@ Untuk memulai bot dan memunculkan QR Code untuk di-scan, jalankan:
 node index.js
 ```
 *(Catatan: Sesuaikan `index.js` dengan nama file utama aplikasi Anda).*
-
----
-
-### 📸 Tampilan Menu Bot (Preview)
-
-> 💡 *Tips: Anda bisa meletakkan screenshot bot Anda di dalam tabel ini agar calon pengguna bisa melihat estetikanya.*
-
-| 📱 Menu Utama | 🤖 Fitur AI & Downloader |
-| :---: | :---: |
-| <img src="https://ubuntu.com" width="100%" alt="Menu Promo"> | <img src="https://ubuntu.com" width="100%" alt="Menu AI"> |
 
 ---
 
