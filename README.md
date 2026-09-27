@@ -1,9 +1,7 @@
 # 🤖 Bot WhatsApp Pro
 ### 🚀 Auto Promotion Bot • AI & Downloader Features
 
-![Node.js](https://shields.io)
-![Library](https://shields.io)
-![Status](https://shields.io)
+> **Environment:** `🟢 Node.js v20` &nbsp;&nbsp;|&nbsp;&nbsp; **Core Library:** `⚡ Baileys` &nbsp;&nbsp;|&nbsp;&nbsp; **Status:** `👑 Active`
 
 ---
 
