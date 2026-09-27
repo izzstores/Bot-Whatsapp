@@ -1,13 +1,14 @@
 <p align="center">
-  <img src="https://demolab.com🤖+WhatsApp+Bot+Pro;🚀+Auto+Promotion+Bot;✨+AI+%26+Downloader+Features" alt="Typing SVG" />
+  <img src="https://herokuapp.com" alt="Typing SVG" />
 </p>
 
 <p align="center">
-  <img src="https://shields.io" alt="Node.js">
-  <img src="https://shields.io" alt="Baileys">
-  <img src="https://shields.io" alt="Status">
+  <img src="https://shields.io" alt="Node.js" />
+  <img src="https://shields.io" alt="Baileys" />
+  <img src="https://shields.io" alt="Status" />
 </p>
 
+---
 ---
 
 ### 📖 Deskripsi Proyek
