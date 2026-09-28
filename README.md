@@ -61,6 +61,11 @@ npm install axios @fal-ai/serverless-client @google/genai
 
 # Install TikTok Downloader API
 npm i @tobyg74/tiktok-api-dl
+
+# Install Vidio Editor
+npm install @napi-rs/canvas
+sudo apt update
+sudo apt install -y ffmpeg
 ```
 
 #### 🟡 LANGKAH 3: Jalankan Bot
