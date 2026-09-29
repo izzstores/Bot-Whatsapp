@@ -2420,6 +2420,56 @@ async function startBot() {
             // ==============================
             // BUTTON MENU
             // ==============================
+
+            if (buttonId === "menu_broadcast") {
+                if (!isOwner(sender)) {
+                    await sock.sendMessage(from, {
+                        text: "⛔ Fitur ini khusus Owner."
+                    });
+                    return;
+                }
+
+                await sock.sendMessage(from, {
+                    text:
+                        "🚀 *BROADCAST PROMO*\n\n" +
+                        "Promo yang akan dikirim:\n\n" +
+                        `${promoData.text}\n\n` +
+                        "Tekan tombol broadcast untuk menjalankan pengiriman."
+                });
+
+                await triggerBroadcast(sock);
+                return;
+            }
+
+            if (buttonId === "menu_status") {
+                if (!isOwner(sender)) {
+                    await sock.sendMessage(from, {
+                        text: "⛔ Fitur ini khusus Owner."
+                    });
+                    return;
+                }
+
+                await sendStatus(sock, from);
+                return;
+            }
+
+            if (buttonId === "menu_cekpromo") {
+                if (!isOwner(sender)) {
+                    await sock.sendMessage(from, {
+                        text: "⛔ Fitur ini khusus Owner."
+                    });
+                    return;
+                }
+
+                await sock.sendMessage(from, {
+                    text:
+                        `📢 *ISI PROMO SAAT INI*\n\n${promoData.text}`
+                });
+
+                return;
+            }
+
+
             if (buttonId === "menu_home") {
                 await sendMainMenu(sock, from, sender);
                 return;
@@ -3638,6 +3688,7 @@ function runScheduler(sock) {
             new Date().toLocaleTimeString(
                 "en-GB",
                 {
+                    timeZone: "Asia/Jakarta",
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: false
