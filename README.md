@@ -61,6 +61,7 @@ npm install axios @fal-ai/serverless-client @google/genai
 npm install @fal-ai/client
 npm install axios fs-extra docx pptxgenjs pdfkit
 ollama pull qwen2.5vl:3b
+ollama pull qwen3:4b
 
 # Install TikTok Downloader API
 npm i @tobyg74/tiktok-api-dl
