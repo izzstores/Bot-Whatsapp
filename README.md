@@ -32,7 +32,7 @@ Jalankan perintah ini secara berurutan di terminal VPS Anda:
 apt update && apt install nodejs npm -y
 
 # Install NVM (Node Version Manager)
-curl -o- https://githubusercontent.com | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 
 # Reload konfigurasi shell
 source ~/.bashrc
@@ -58,7 +58,7 @@ npm install @whiskeysockets/baileys pino fs-extra qrcode-terminal
 
 # Install dependensi API AI & HTTP Client
 npm install axios @fal-ai/serverless-client @google/genai
-
+npm install @fal-ai/client
 # Install TikTok Downloader API
 npm i @tobyg74/tiktok-api-dl
 
