@@ -66,6 +66,28 @@ npm i @tobyg74/tiktok-api-dl
 npm install @napi-rs/canvas
 sudo apt update
 sudo apt install -y ffmpeg
+
+# 1. Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Pastikan service aktif
+systemctl enable --now ollama
+
+# 3. Buat konfigurasi Ollama
+mkdir -p /etc/systemd/system/ollama.service.d
+
+cat > /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+[Service]
+Environment="OLLAMA_KEEP_ALIVE=1m"
+Environment="OLLAMA_NUM_PARALLEL=1"
+Environment="OLLAMA_MAX_LOADED_MODELS=1"
+Environment="OLLAMA_CONTEXT_LENGTH=2048"
+EOF
+
+# 4. Terapkan konfigurasi
+systemctl daemon-reload
+systemctl restart ollama
+
 ```
 
 #### 🟡 LANGKAH 3: Jalankan Bot
