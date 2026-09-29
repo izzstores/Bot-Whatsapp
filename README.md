@@ -60,6 +60,8 @@ npm install @whiskeysockets/baileys pino fs-extra qrcode-terminal
 npm install axios @fal-ai/serverless-client @google/genai
 npm install @fal-ai/client
 npm install axios fs-extra docx pptxgenjs pdfkit
+ollama pull qwen2.5vl:3b
+
 # Install TikTok Downloader API
 npm i @tobyg74/tiktok-api-dl
 
