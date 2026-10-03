@@ -36,6 +36,320 @@ const BOT_DIR =
 const STAGING_DIR =
     path.join(BOT_DIR, ".ai-staging");
 
+// ============================================================
+// HYBRID AI / WEB RESEARCH
+// ============================================================
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY || "";
+const SERPER_API_KEY = process.env.SERPER_API_KEY || "";
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.7-flash";
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+
+const HYBRID_TIMEOUT = Number(process.env.HYBRID_TIMEOUT || 45000);
+const RESEARCH_MAX_RESULTS = Number(process.env.RESEARCH_MAX_RESULTS || 6);
+
+function hasExternalAI() {
+    return Boolean(
+        GEMINI_API_KEY ||
+        GROQ_API_KEY ||
+        OPENROUTER_API_KEY
+    );
+}
+
+function looksLikeResearchQuestion(prompt) {
+    const text = String(prompt || "").toLowerCase();
+
+    const explicit = /(cari|search|telusuri|riset|research|cek|check|terbaru|terkini|hari ini|sekarang|2026|update|harga|spesifikasi|spec|review|berita|sumber|referensi|website|internet|online|vps|hosting|server|api terbaru)/i;
+    const current = /(berapa harga|berapa biaya|masih tersedia|masih berlaku|versi terbaru|latest|current|sekarang|saat ini)/i;
+
+    return explicit.test(text) || current.test(text);
+}
+
+function looksLikeFileRequest(prompt) {
+    return /(buat|bikin|hasilkan|generate|kirim|jadikan).*(pdf|word|docx|ppt|pptx|powerpoint)/i.test(String(prompt || ""));
+}
+
+async function fetchWithTimeout(url, options = {}, timeout = HYBRID_TIMEOUT) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function callOpenAICompatible({ baseURL, apiKey, model, messages }) {
+    if (!apiKey) throw new Error("API key tidak tersedia.");
+
+    const response = await fetchWithTimeout(
+        `${baseURL}/chat/completions`,
+        {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model,
+                messages,
+                temperature: 0.3,
+                max_tokens: 1800
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data?.error?.message || `HTTP ${response.status}`);
+    }
+
+    return data?.choices?.[0]?.message?.content?.trim() || "";
+}
+
+async function callGemini(messages) {
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY tidak tersedia.");
+
+    const contents = messages
+        .filter(m => m.role !== "system")
+        .map(m => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: String(m.content || "") }]
+        }));
+
+    const systemInstruction = messages.find(m => m.role === "system");
+
+    const body = {
+        contents,
+        generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 1800
+        }
+    };
+
+    if (systemInstruction) {
+        body.systemInstruction = {
+            parts: [{ text: String(systemInstruction.content || "") }]
+        };
+    }
+
+    const response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data?.error?.message || `HTTP ${response.status}`);
+    }
+
+    return data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim() || "";
+}
+
+async function callExternalAI(messages, preferred = "main") {
+    const providers = preferred === "review"
+        ? [
+            ["groq", () => callOpenAICompatible({
+                baseURL: "https://api.groq.com/openai/v1",
+                apiKey: GROQ_API_KEY,
+                model: GROQ_MODEL,
+                messages
+            })],
+            ["gemini", () => callGemini(messages)],
+            ["openrouter", () => callOpenAICompatible({
+                baseURL: "https://openrouter.ai/api/v1",
+                apiKey: OPENROUTER_API_KEY,
+                model: OPENROUTER_MODEL,
+                messages
+            })]
+        ]
+        : [
+            ["gemini", () => callGemini(messages)],
+            ["groq", () => callOpenAICompatible({
+                baseURL: "https://api.groq.com/openai/v1",
+                apiKey: GROQ_API_KEY,
+                model: GROQ_MODEL,
+                messages
+            })],
+            ["openrouter", () => callOpenAICompatible({
+                baseURL: "https://openrouter.ai/api/v1",
+                apiKey: OPENROUTER_API_KEY,
+                model: OPENROUTER_MODEL,
+                messages
+            })]
+        ];
+
+    const errors = [];
+
+    for (const [name, fn] of providers) {
+        try {
+            if ((name === "gemini" && !GEMINI_API_KEY) ||
+                (name === "groq" && !GROQ_API_KEY) ||
+                (name === "openrouter" && !OPENROUTER_API_KEY)) {
+                continue;
+            }
+
+            const result = await fn();
+            if (result) return { provider: name, text: result };
+        } catch (error) {
+            errors.push(`${name}: ${error.message}`);
+            console.error(`⚠️ AI PROVIDER ${name}:`, error.message);
+        }
+    }
+
+    throw new Error(errors.join(" | ") || "Tidak ada AI eksternal yang aktif.");
+}
+
+function normalizeSearchResults(items, source) {
+    return (items || []).slice(0, RESEARCH_MAX_RESULTS).map((item, index) => ({
+        no: index + 1,
+        source,
+        title: item.title || item.name || "Tanpa judul",
+        url: item.url || item.link || "",
+        snippet: item.content || item.snippet || item.description || ""
+    }));
+}
+
+async function searchTavily(query) {
+    if (!TAVILY_API_KEY) return [];
+
+    const response = await fetchWithTimeout(
+        "https://api.tavily.com/search",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                api_key: TAVILY_API_KEY,
+                query,
+                search_depth: "basic",
+                max_results: RESEARCH_MAX_RESULTS,
+                include_answer: false
+            })
+        }
+    );
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.detail || `Tavily HTTP ${response.status}`);
+    return normalizeSearchResults(data.results, "Tavily");
+}
+
+async function searchSerper(query) {
+    if (!SERPER_API_KEY) return [];
+
+    const response = await fetchWithTimeout(
+        "https://google.serper.dev/search",
+        {
+            method: "POST",
+            headers: {
+                "X-API-KEY": SERPER_API_KEY,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                q: query,
+                num: RESEARCH_MAX_RESULTS,
+                gl: "id",
+                hl: "id"
+            })
+        }
+    );
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || `Serper HTTP ${response.status}`);
+    return normalizeSearchResults(data.organic, "Serper");
+}
+
+async function researchWeb(query) {
+    const tasks = [];
+
+    if (TAVILY_API_KEY) tasks.push(searchTavily(query));
+    if (SERPER_API_KEY) tasks.push(searchSerper(query));
+
+    if (!tasks.length) return [];
+
+    const results = await Promise.allSettled(tasks);
+    return results
+        .filter(r => r.status === "fulfilled")
+        .flatMap(r => r.value)
+        .filter((item, index, arr) =>
+            item.url && arr.findIndex(x => x.url === item.url) === index
+        )
+        .slice(0, RESEARCH_MAX_RESULTS * 2);
+}
+
+function formatResearchSources(sources) {
+    return sources.map(item =>
+        `[${item.no}] ${item.title}\nURL: ${item.url}\nRingkasan: ${item.snippet}`
+    ).join("\n\n");
+}
+
+async function runHybridResearch(prompt) {
+    const sources = await researchWeb(prompt);
+
+    if (!sources.length) {
+        throw new Error("Tidak ada sumber web yang berhasil ditemukan. Pastikan TAVILY_API_KEY atau SERPER_API_KEY sudah diisi.");
+    }
+
+    const sourceText = formatResearchSources(sources);
+
+    const analystPrompt = [
+        {
+            role: "system",
+            content: "Kamu adalah analis riset. Gunakan HANYA sumber yang diberikan. Bedakan fakta, angka, tanggal, dan ketidakpastian. Jangan mengarang. Buat temuan singkat untuk AI lain yang akan menulis jawaban akhir."
+        },
+        {
+            role: "user",
+            content: `Pertanyaan pengguna:\n${prompt}\n\nHASIL PENCARIAN WEB:\n${sourceText}`
+        }
+    ];
+
+    const analyst = await callExternalAI(analystPrompt, "main");
+
+    const reviewerPrompt = [
+        {
+            role: "system",
+            content: "Kamu reviewer independen. Periksa analisis berikut terhadap sumber yang tersedia. Tunjukkan jika ada klaim yang tidak didukung, konflik antar sumber, atau informasi yang sudah tidak pasti. Jangan menambahkan fakta dari ingatan."
+        },
+        {
+            role: "user",
+            content: `Pertanyaan:\n${prompt}\n\nSumber:\n${sourceText}\n\nAnalisis pertama:\n${analyst}`
+        }
+    ];
+
+    const reviewer = await callExternalAI(reviewerPrompt, "review");
+
+    const finalPrompt = [
+        {
+            role: "system",
+            content: "Kamu adalah final answer writer IZZ BOT. Tulis jawaban akhir dalam Bahasa Indonesia yang jelas dan natural. Gunakan hanya informasi yang didukung sumber dan review. Jangan menyebut proses internal, AI lain, analyst, reviewer, atau API. Jika ada ketidakpastian, jelaskan. Cantumkan sumber dengan nomor [1], [2], dst. Jangan membuat URL baru."
+        },
+        {
+            role: "user",
+            content: `Pertanyaan pengguna:\n${prompt}\n\nSUMBER WEB:\n${sourceText}\n\nANALISIS:\n${analyst}\n\nREVIEW:\n${reviewer}\n\nBuat jawaban final untuk pengguna.`
+        }
+    ];
+
+    const final = await callExternalAI(finalPrompt, "main");
+
+    return {
+        text: cleanAIText(final.text),
+        provider: final.provider,
+        sources
+    };
+}
+
+
 const BACKUP_DIR =
     path.join(BOT_DIR, ".ai-backups");
 
@@ -989,145 +1303,122 @@ async function runAgent({
     owner = false,
     images = []
 }) {
-    let workingPrompt = prompt;
+    // Owner/debugging dan permintaan file tetap memakai agent Ollama
+    // agar tool internal dan generator file tidak hilang.
+    if (owner || looksLikeFileRequest(prompt)) {
+        let workingPrompt = prompt;
 
-    // Vision selalu dilakukan terpisah.
-    // Hasil vision kemudian diberikan ke model teks/tool-calling.
-    if (images.length) {
-        const visionText =
-            await analyzeImage(
-                images[0],
-                prompt
-            );
-
-        workingPrompt =
-            `${prompt}
-
-HASIL ANALISIS GAMBAR:
-${visionText}
-
-Gunakan hasil analisis gambar di atas sebagai konteks.
-Jika pengguna meminta membuat file, gunakan tool file yang sesuai.`;
-    }
-
-    const messages = [
-        {
-            role: "system",
-            content:
-                buildSystemPrompt({ owner })
-        },
-        {
-            role: "user",
-            content: workingPrompt
+        if (images.length) {
+            const visionText = await analyzeImage(images[0], prompt);
+            workingPrompt = `${prompt}\n\nHASIL ANALISIS GAMBAR:\n${visionText}\n\nGunakan hasil analisis gambar di atas sebagai konteks.`;
         }
-    ];
 
-    const availableTools =
-        owner
+        const messages = [
+            { role: "system", content: buildSystemPrompt({ owner }) },
+            { role: "user", content: workingPrompt }
+        ];
+
+        const availableTools = owner
             ? TOOLS
             : TOOLS.filter(tool => [
                 "create_docx",
                 "create_pptx",
                 "create_pdf"
-            ].includes(
-                tool.function.name
-            ));
+            ].includes(tool.function.name));
 
-    const files = [];
+        const files = [];
 
-    for (let round = 0; round < 8; round++) {
-        const response =
-            await ollamaChat({
+        for (let round = 0; round < 8; round++) {
+            const response = await ollamaChat({
                 model: TEXT_MODEL,
                 messages,
                 tools: availableTools
             });
 
-        const message =
-            response?.message;
+            const message = response?.message;
+            if (!message) throw new Error("Ollama tidak mengembalikan message.");
 
-        if (!message) {
-            throw new Error(
-                "Ollama tidak mengembalikan message."
-            );
-        }
+            messages.push(message);
+            const toolCalls = message.tool_calls || [];
 
-        messages.push(message);
+            if (!toolCalls.length) {
+                return { text: cleanAIText(message.content), files };
+            }
 
-        const toolCalls =
-            message.tool_calls || [];
+            for (const call of toolCalls) {
+                const name = call.function?.name;
+                const args = normalizeToolArguments(call.function?.arguments);
 
-        if (!toolCalls.length) {
-            return {
-                text:
-                    cleanAIText(
-                        message.content
-                    ),
-                files
-            };
-        }
+                console.log(`🤖 AI TOOL: ${name}`, args);
 
-        for (const call of toolCalls) {
-            const name =
-                call.function?.name;
-
-            const args =
-                normalizeToolArguments(
-                    call.function?.arguments
-                );
-
-            console.log(
-                `🤖 AI TOOL: ${name}`,
-                args
-            );
-
-            try {
-                const result =
-                    await executeTool(
-                        name,
-                        args
-                    );
-
-                if (
-                    result &&
-                    result.file
-                ) {
-                    files.push(
-                        result.file
-                    );
+                try {
+                    const result = await executeTool(name, args);
+                    if (result && result.file) files.push(result.file);
+                    messages.push({
+                        role: "tool",
+                        content: JSON.stringify(result)
+                    });
+                } catch (error) {
+                    console.error(`❌ AI TOOL ERROR: ${name}`, error);
+                    messages.push({
+                        role: "tool",
+                        content: JSON.stringify({ error: error.message })
+                    });
                 }
-
-                messages.push({
-                    role: "tool",
-                    content:
-                        JSON.stringify(result)
-                });
-
-            } catch (error) {
-                console.error(
-                    `❌ AI TOOL ERROR: ${name}`,
-                    error
-                );
-
-                messages.push({
-                    role: "tool",
-                    content:
-                        JSON.stringify({
-                            error:
-                                error.message
-                        })
-                });
             }
         }
 
-        // Setelah tool dijalankan, model wajib mendapat
-        // kesempatan untuk memberikan respons akhir.
+        return {
+            text: "AI berhenti setelah batas proses tool tercapai.",
+            files
+        };
     }
 
+    // USER FLOW: external AI -> research bila perlu -> fallback Ollama.
+    if (hasExternalAI()) {
+        try {
+            if (looksLikeResearchQuestion(prompt) && (TAVILY_API_KEY || SERPER_API_KEY)) {
+                const result = await runHybridResearch(prompt);
+                return {
+                    text: result.text,
+                    files: [],
+                    sources: result.sources,
+                    provider: result.provider
+                };
+            }
+
+            const response = await callExternalAI([
+                {
+                    role: "system",
+                    content: buildSystemPrompt({ owner: false }) +
+                        "\nUntuk pertanyaan yang membutuhkan informasi terbaru tetapi belum masuk mode riset, jangan mengarang tanggal/harga/versi. Jawab berdasarkan informasi yang diberikan pengguna."
+                },
+                { role: "user", content: prompt }
+            ], "main");
+
+            return {
+                text: cleanAIText(response.text),
+                files: [],
+                provider: response.provider
+            };
+        } catch (error) {
+            console.error("⚠️ HYBRID AI FALLBACK:", error.message);
+        }
+    }
+
+    // Fallback terakhir: Ollama lokal.
+    const response = await ollamaChat({
+        model: TEXT_MODEL,
+        messages: [
+            { role: "system", content: buildSystemPrompt({ owner: false }) },
+            { role: "user", content: prompt }
+        ]
+    });
+
     return {
-        text:
-            "AI berhenti setelah batas proses tool tercapai.",
-        files
+        text: cleanAIText(response?.message?.content || ""),
+        files: [],
+        provider: "ollama"
     };
 }
 
